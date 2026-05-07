@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* ベース設定 */
+        body {
+            font-family: "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin-left: 3%;
+            margin-right: 5%;
+            padding: 0;
+            background-color: #fcfcfc;
+        }
+
+        /* 目次エリア（右側フローティング・格納式） */
+        #toc-container {
+            position: fixed;
+            top: 0;
+            right: -260px;
+            /* ★通常は画面外に隠す（幅300pxのうち40pxだけ見せる） */
+            width: 300px;
+            height: 100vh;
+            background-color: #f4f4f4;
+            box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
+            transition: right 0.3s ease;
+            /* ★なめらかに動く設定 */
+            z-index: 1000;
+            display: flex;
+            /* タブと中身を横並び */
+        }
+
+        /* カーソルが乗った時に飛び出す設定 */
+        #toc-container:hover {
+            right: 0;
+            /* 画面内に出てくる */
+        }
+
+        /* 目次の「つまみ（タブ）」 */
+        #toc-tab {
+            width: 40px;
+            /* つまみの幅 */
+            background-color: #AE3379;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            writing-mode: vertical-rl;
+            /* 縦書き */
+            font-weight: bold;
+            letter-spacing: 3px;
+            cursor: pointer;
+            user-select: none;
+            border-radius: 5px 0 0 5px;
+        }
+
+        /* 目次リスト本体 */
+        #toc-content-wrapper {
+            width: 260px;
+            overflow-y: auto;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        #toc-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        #toc-list li {
+            margin-bottom: 4px;
+        }
+
+        #toc-list a {
+            text-decoration: none;
+            color: #666;
+            font-size: 0.9em;
+            display: block;
+            padding: 5px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        #toc-list a:hover {
+            background-color: #e0e0e0;
+        }
+
+        /* アクティブな目次 */
+        #toc-list a.active {
+            color: #AE3379;
+            background-color: #dcefff;
+            font-weight: bold;
+            border-left: 3px solid #AE3379;
+        }
+
+        /* メインコンテンツエリア */
+        #main-content {
+            max-width: 800px;
+            margin: 0 auto;
+            /* 中央寄せ */
+            padding: 40px 20px;
+            /* 右側に目次タブ分の余白を少し確保（被り防止） */
+            padding-right: 50px;
+        }
+
+        /* コンテンツ装飾 */
+        h2 {
+            background-color: #AE3379;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin-top: 60px;
+            font-size: 1.5em;
+            scroll-margin-top: 20px;
+        }
+
+        .question-block {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+            background-color: #fff;
+        }
+
+        h3 {
+            border-left: 5px solid #AE3379;
+            padding-left: 10px;
+            color: #AE3379;
+        }
+
+        .similar-question {
+            background-color: #f9f9f9;
+            border: 1px dashed #bbb;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+        }
+
+        .options-vertical {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .options-horizontal {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+            background-color: #eee;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .citation {
+            font-size: 0.8em;
+            color: #888;
+            text-align: right;
+        }
+
+        /* スマホ・極小画面対応 */
+        @media (max-width: 600px) {
+            #main-content {
+                padding-right: 20px;
+            }
+
+            /* スマホでも邪魔なら以下で目次を非表示にすることも可能 */
+            /* #toc-container { display: none; } */
+        }
+
+        /* 解説コンテナ全体のスタイル */
+        .explanation-container {
+            margin-top: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+            overflow: hidden;
+        }
+
+        /* クリックする見出し部分 */
+        .explanation-title {
+            padding: 10px 15px;
+            background-color: #eee;
+            cursor: pointer;
+            font-weight: bold;
+            list-style: none;
+            /* デフォルトの三角形を消したい場合 */
+            display: flex;
+            align-items: center;
+        }
+
+        /* 三角アイコンのカスタマイズ（任意） */
+        .explanation-title::before {
+            content: "▶";
+            margin-right: 10px;
+            font-size: 0.8em;
+            transition: transform 0.3s;
+        }
+
+        /* 開いている時のアイコン変化 */
+        .explanation-container[open] .explanation-title::before {
+            transform: rotate(90deg);
+        }
+
+        /* 解説の中身 */
+        .explanation-content {
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            line-height: 1.6;
+            background-color: #ffffff;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- 目次コンテナ（ここを追加） -->
+    <nav id="toc-container">
+        <strong>目次</strong>
+        <ul id="toc-list">
+            <!-- JSでここにリストが生成されます -->
+        </ul>
+    </nav>
+
+    <!-- コンテンツ本文 (一部抜粋・これまでの出力内容が入ります) -->
+    <div id="content-main">
+        <h2>[歯科口腔外科 全問題]</h2>
+
+        <div class="question-block">
+            【問】癌化学療法を予定している患者に口腔管理を行う理由はどれか。2つ選べ。（23 問1）
+            <div class="options-vertical">
+                a. 嘔吐の抑制<br>
+                b. 抗腫瘍薬感受性の向上<br>
+                c. 口内炎の抑制<br>
+                d. 感染源の除去<br>
+                e. 嚥下反射の誘発<br>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】口腔癌で発生頻度が最も高いのはどれか。（23 問2, 22 問20）
+            <div class="options-vertical">
+                a. 舌癌 b. 口底癌 c. 歯肉癌 d. 頰粘膜癌 e. 口唇癌
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】薬剤関連顎骨壊死の発症に関わるのはどれか。2つ選べ。（23 問3）
+            <div class="options-vertical">
+                a. ニフェジピン<br>
+                b. ピロカルピン塩酸塩<br>
+                c. アレンドロン酸ナトリウム水和物<br>
+                d. スコポラミン臭化水素酸塩水和物<br>
+                e. デノスマブ<br>
+            </div>
+            <div class="similar-question">
+                【類題】薬剤関連顎骨壊死の発症に関わるのはどれか。2 つ選べ。（22 問5）
+                <div class="options-vertical">
+                    a) デノスマブ<br>
+                    b) ピロカルピン塩酸塩<br>
+                    c) アレンドロン酸ナトリウム水和物<br>
+                    d) スコポラミン臭化水素酸塩水和物<br>
+                    e) ロキソプロフェンナトリウム水和物<br>
+                </div>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】口腔潜在的悪性疾患はどれか。3つ選べ。（23 問4, 22 問7）
+            <div class="options-vertical">
+                a. 尋常性天疱瘡 b. 帯状疱疹 c. 口腔扁平苔癬 d. 白板症 e. 紅板症
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】正常な歯の歯冠部に認められない組織はどれか。2つ選べ。（23 問5, 22 問9）
+            <div class="options-vertical">
+                a. 歯肉 b. エナメル質 c. 象牙質 d. 歯髄 e. セメント質
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】中咽頭癌患者への周術期口腔機能管理の目的はどれか。3つ選べ。（23 問6, 22 問14）
+            <div class="options-vertical">
+                a. 手術時間の短縮<br>
+                b. 入院期間の短縮<br>
+                c. 呼吸器感染症の予防<br>
+                d. 手術時出血量の軽減<br>
+                e. 口腔粘膜炎重症化の予防<br>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】歯周病の疫学的要因として明らかなのはどれか。1つ選べ。（23 問7, 22 問19）
+            <div class="options-vertical">
+                a. 加齢 b. 肺炎 c. 飲酒 d. 睡眠不足 e. 食塩過剰摂取
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】がんの薬物療法によって口腔に発生する有害事象はどれか。3つ選べ。（23 問8, 22 問2）
+            <div class="options-vertical">
+                a. 顎骨壊死 b. 味覚障害 c. 口腔粘膜炎 d. 慢性 GVHD e. 線維性異形成症
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】舌後方 1/3の味覚をつかさどる神経はどれか。1つ選べ。（23 問9）
+            <div class="options-vertical">
+                a. 三叉神経 b. 顔面神経 c. 舌咽神経 d. 副神経 e. 舌下神経
+            </div>
+            <div class="similar-question">
+                【類題】舌後方 1/3 の味覚をつかさどる神経はどれか。1 つ選べ。（22 問6）
+                <div class="options-vertical">
+                    a) 顔面神経 b) 三叉神経 c) 迷走神経 d) 舌下神経 e) 舌咽神経
+                </div>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】外頸動脈から直接分枝するのはどれか。1つ選べ。（23 問10）
+            <div class="options-vertical">
+                a. 頰動脈 b. 舌下動脈 c. 顔面動脈 d. 下歯槽動脈 e. オトガイ下動脈
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】大唾液腺はどれか。すべて選べ。（23 問11, 22 問12）
+            <div class="options-vertical">
+                a. 口唇腺 b. 舌下腺 c. 口蓋腺 d. 顎下腺 e. 耳下腺
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】乳歯について正しいのはどれか。2つ選べ。（23 問12）
+            <div class="options-vertical">
+                a. 20本である。<br>
+                b. 臼歯から生え始める。<br>
+                c. 5〜6歳で生え終わる。<br>
+                d. 生後 6〜8か月から生え始める。<br>
+                e. lO歳ころから永久歯に生え変わり始める。<br>
+            </div>
+            <div class="similar-question">
+                【類題】乳歯について正しいのはどれか。1 つ選べ。（22 問13）
+                <div class="options-vertical">
+                    a) 32 本である。<br>
+                    b) 臼歯から生え始める。<br>
+                    c) 5～6 歳で生え終わる。<br>
+                    d) 生後 6～8 か月から生え始める。<br>
+                    e) 10 歳ごろから永久歯に生え変わり始める。<br>
+                </div>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】13．基底細胞母斑症候群の随伴病変はどれか。1つ選べ。（23 問13, 22 問1）
+            <div class="options-vertical">
+                a. 粘液腫 b. 歯原性角化囊胞 c. エナメル上皮腫 d. 腺様歯原性腫瘍 e. 歯原性癌腫
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】エナメル上皮腫の特徴はどれか。3つ選べ。（23 問14）
+            <div class="options-vertical">
+                a. 高齢者に多い。<br>
+                b. 下顎臼歯部に多い。<br>
+                c. 疼痛を伴うことが多い。<br>
+                d. 緩徐に発育することが多い。<br>
+                e. 顎骨の膨隆をきたすことが多い。<br>
+            </div>
+            <div class="similar-question">
+                【類題】エナメル上皮腫について正しいのはどれか。2 つ選べ。（22 問18）
+                <div class="options-vertical">
+                    a) X 線検査では多房性または単房性透過像を示す。<br>
+                    b) 下顎より上顎骨に好発する。<br>
+                    c) 良性腫瘍で再発はしない。<br>
+                    d) 嚢胞中心部の腫瘍細胞は増殖能が強い。<br>
+                    e) ナイフカット状の歯根吸収を生じる。<br>
+                </div>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】最も発生頻度の多い歯原性腫瘍はどれか。（23 問15）
+            <div class="options-vertical">
+                a. 粘液腫 b. 石灰化歯原性囊胞 c. エナメル上皮腫 d. 腺様歯原性腫瘍 e. 歯原性癌腫
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】口腔がんの予防における健康習慣の実践で適切なのはどれか。3つ選べ。（23 問16, 22 問11）
+            <div class="options-vertical">
+                a. 禁煙<br>
+                b. 適正体重の維持<br>
+                c. 糖質コントロール<br>
+                d. 過度な飲酒習慣の改善<br>
+                e. 定期的な口腔衛生管理<br>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】17．最も早期に萌出する下顎乳歯はどれか。（23 問17）
+            <div class="options-vertical">
+                a. 乳中切歯 b. 乳側切歯 c. 乳犬歯 d. 第一乳臼歯 e. 第二乳臼歯
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】下顎骨骨折の特徴はどれか。2つ選べ。（23 問18）
+            <div class="options-vertical">
+                a. 筋突起は好発部位である。<br>
+                b. 関節突起では直達骨折が多い。<br>
+                c. 下顎枝部では複雑骨折が多い。<br>
+                d. 正中部では骨片呼吸がみられる。<br>
+                e. 大臼歯部では下唇の知覚麻痺がみられる。<br>
+            </div>
+            <div class="similar-question">
+                【類題】下顎骨骨折の特徴はどれか。2 つ選べ。（22 問8）
+                <div class="options-vertical">
+                    a) 筋突起は好発部位である。<br>
+                    b) 関節突起では直達骨折が多い。<br>
+                    c) 下顎枝部では複雑骨折が多い。<br>
+                    d) 正中部では片側呼吸がみられる。<br>
+                    e) 大臼歯部では下歯槽神経麻痺がみられる。<br>
+                </div>
+            </div>
+            <div class="similar-question">
+                【類題】下顎骨関節突起部骨折の臨床的特徴はどれか。1 つ選べ。（22 問10）
+                <div class="options-vertical">
+                    a) 類部の打撲による直達骨折である。<br>
+                    b) 両側性骨折が多い。<br>
+                    c) 複雑骨折が多い。<br>
+                    d) オトガイ部が健側に偏位する。<br>
+                    e) 手術時は顔面神経への留意が必要。<br>
+                </div>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】ガマ腫の一般的治療法はどれか。2つ選べ。（23 問19）
+            <div class="options-vertical">
+                a. 開窓術 b. 穿刺吸引療法 c. 舌下腺摘出術 d. 抗がん剤治療 e. 放射線治療
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】歯原性囊胞はどれか。2つ選べ。（23 問20）
+            <div class="options-vertical">
+                a. 術後性上顎囊胞 b. 歯根囊胞 c. 含歯性囊胞 d. 単純性骨囊胞 e. 鼻口蓋管囊胞
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】唇裂に対して初回の口唇形成術を行う時期はどれか。1 つ選べ。（22 問3）
+            <div class="options-vertical">
+                a) 3～6 か月 b) 8～12 か月 c) 1 歳 6 か月～2 歳 d) 3～4 歳 e) 5～6 歳
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】上顎突起と内側鼻突起の癒合不全による奇形はどれか。1 つ選べ。（22 問4）
+            <div class="options-vertical">
+                a) 片側口唇裂 b) 口蓋裂 c) 正中上顎口唇裂 d) 斜顔裂 e) 横顔裂
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】Treacher Collins 症候群と Pierre Robin 症候群とに共通して認められるのはどれか。1 つ選べ。（22 問15）
+            <div class="options-vertical">
+                a) 過剰歯 b) 先天歯 c) 反対咬合 d) 下顎劣成⾧ e) 上顎育成⾧
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】化学療法を受けている女性の口腔病変に対する適切な対応はどれか。3 つ選べ。（22 問16）
+            <div class="options-vertical">
+                a) 口腔の保湿<br>
+                b) 抗真菌薬の投与<br>
+                c) CO₂レーザーの照射<br>
+                d) 創傷被覆保護剤の塗布<br>
+                e) 局所麻酔薬添加剤の使用<br>
+            </div>
+        </div>
+
+        <div class="question-block">
+            【問】顔面外傷を伴う救急患者において頭蓋底骨折が疑われるのはどれか。2 つ選べ。（22 問17）
+            <div class="options-vertical">
+                a) 髄液漏 b) Bell 現象 c) Battle 徴候 d) Vincent 症状 e) ホルネル症候群
+            </div>
+        </div>
+        <script>
+            const tocList = document.getElementById("toc-list");
+            const headings = document.querySelectorAll("h2");
+            const tocLinks = [];
+
+            // 目次生成
+            headings.forEach((h2, i) => {
+                const id = "section-" + (i + 1);
+                h2.id = id;
+                const li = document.createElement("li");
+                const a = document.createElement("a");
+                a.href = "#" + id;
+                a.textContent = h2.textContent.replace("[", "").replace("]", "");
+                a.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+                });
+                li.appendChild(a);
+                tocList.appendChild(li);
+                tocLinks.push(a);
+            });
+
+            // ハイライト監視
+            const observer = new IntersectionObserver(
+                entries => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            tocLinks.forEach(link => link.classList.remove("active"));
+                            const index = [...headings].indexOf(entry.target);
+                            if (tocLinks[index]) {
+                                tocLinks[index].classList.add("active");
+                                // アクティブな項目が見えるように目次内スクロール
+                                tocLinks[index].scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                            }
+                        }
+                    });
+                },
+                { rootMargin: "-40% 0px -55% 0px", threshold: 0 }
+            );
+            headings.forEach(h2 => observer.observe(h2));
+        </script>
+
+</body>
+
+</html>
